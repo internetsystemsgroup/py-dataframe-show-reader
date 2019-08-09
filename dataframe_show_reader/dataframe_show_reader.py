@@ -15,8 +15,15 @@
 from datetime import datetime
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import Row
-from pyspark.sql.types import (BooleanType, DoubleType, IntegerType, LongType,
-                               StringType, StructType, StructField, TimestampType)
+from pyspark.sql.types import (ArrayType, BooleanType, DoubleType, FloatType, IntegerType,
+                               LongType, StringType, StructType, StructField, TimestampType)
+
+
+DATA_TYPE_START_INDICATOR = '{'
+DATA_TYPE_END_INDICATOR = '}'
+
+ARRAY_ELEMENT_START_INDICATOR = '['
+ARRAY_ELEMENT_END_INDICATOR = ']'
 
 
 def show_output_to_df(show_output: str, spark_session: SparkSession):
@@ -38,10 +45,10 @@ def show_output_to_df(show_output: str, spark_session: SparkSession):
     |value 2a|value 2b|
 
     Optionally, data types can be specified in a second header line (prefixed
-    with "["):
+    with the DATA_TYPE_START_INDICATOR "{") :
     +-------------+----------+------------+-------------------+-----------+
     |string_column|int_column|float_column|timestamp_column   |bool_column|
-    [string       |int       |float       |timestamp          |boolean    ]
+    {string       |int       |float       |timestamp          |boolean    }
     +-------------+----------+------------+-------------------+-----------+
     |one          |1         |1.1         |2018-01-01 00:00:00|true       |
     |two          |2         |2.2         |2018-01-02 12:34:56|false      |
@@ -63,7 +70,7 @@ def show_output_to_df(show_output: str, spark_session: SparkSession):
     schema = None
     for line in show_output.strip().splitlines():
         line = line.strip()
-        if not line.startswith(tuple('|[')):
+        if not line.startswith(tuple(f'|{DATA_TYPE_START_INDICATOR}')):
             continue
         line_parts = line.split('|')[1:-1]
         values = [part.strip() for part in line_parts]
@@ -72,8 +79,8 @@ def show_output_to_df(show_output: str, spark_session: SparkSession):
         if column_names == None:
             column_names = values
             continue
-        elif types == None and line.startswith('['):
-            line = line.replace('[', '|').replace(']', '|')
+        elif types == None and line.startswith(f'{DATA_TYPE_START_INDICATOR}'):
+            line = line.replace(f'{DATA_TYPE_START_INDICATOR}', '|').replace(f'{DATA_TYPE_END_INDICATOR}', '|')
             types = [part.strip() for part in line.split('|')[1:-1]]
             schema = _get_schema(column_names, types)
             continue
@@ -132,6 +139,73 @@ def ts(timestamp_string: str):
     """
     return datetime.strptime(timestamp_string, '%Y-%m-%d %H:%M:%S')
 
+def array_string_to_list(the_string: str, data_type: type = str, splitter: str = ','):
+    """
+    Convert a DataFrame show output-style array string into a list value
+    which will marshall to a Hive/Spark ArrayType
+    :param the_string: A string in the format: '[val1, val2, val3]'
+    :param data_type: The data_type of each element in the array.
+    :param splitter: The char/string on which we split the str_array
+    :return: A list object with elements of type: 'data_type'.
+    """
+    array_bounds = f"{ARRAY_ELEMENT_START_INDICATOR}{ARRAY_ELEMENT_END_INDICATOR}"
+    list_of_strings = [x for x in the_string.strip().strip(array_bounds).split(splitter)]
+
+    # Handle the empty list case cuz we can't cast an empty string to a number type.
+    return ([]
+            if len(list_of_strings) == 0 or (len(list_of_strings) == 1 and list_of_strings[0] == '')
+            else [data_type(x) for x in list_of_strings])
+
+
+def array_of_array_string_to_list(the_string: str, data_type: type = str):
+    """
+    Convert a DataFrame show output-style array of arrays string into a list of lists value
+    which will marshall to a Hive/Spark ArrayType(ArrayType(data_type))
+    :param the_string: A string in the format: '[[val1,val2], [val3,val4], [val5]]'
+    :param data_type: The data_type of each element in the inner arrays.
+    :return: A list object with elements of type: list of type 'data_type'.
+    """
+    # We need to remove the start & end characters.
+    # Then replace the outer array's '],' with something other than a comma
+    # so we don't split on the inner arrays' commas.
+    #
+    # So we change this: '[[val1,val2], [val3,val4], [val5]]'
+    #                to:  '[val1,val2], [val3,val4], [val5]'
+    #              then:  '[val1,val2]| [val3,val4]| [val5]'
+    # Then split on '|' and convert each '[val1,val2]' to a list.
+    new_separator = '|'
+    inner_end_bound = f"{ARRAY_ELEMENT_END_INDICATOR},"
+    new_inner_end_bound = f"{ARRAY_ELEMENT_END_INDICATOR}{new_separator}"
+
+    return ([array_string_to_list(x, data_type)
+             for x in the_string.strip()[1:-1]
+                 .replace(inner_end_bound, new_inner_end_bound)
+                 .split(new_separator)])
+
+
+def int_array(the_string: str):
+    return array_string_to_list(the_string, int)
+
+
+def float_array(the_string: str):
+    return array_string_to_list(the_string, float)
+
+
+def str_array(the_string: str):
+    return array_string_to_list(the_string, str)
+
+
+def int_array_of_array(the_string: str):
+    return array_of_array_string_to_list(the_string, int)
+
+
+def float_array_of_array(the_string: str):
+    return array_of_array_string_to_list(the_string, float)
+
+
+def str_array_of_array(the_string: str):
+    return array_of_array_string_to_list(the_string, str)
+
 
 def _cast_types(values: list, types: list):
     for i, value in enumerate(values):
@@ -151,10 +225,19 @@ _TYPE_MAP = {
     '': (str, StringType()),  # Default
     'bigint': (int, LongType()),
     'boolean': (_parse_boolean, BooleanType()),
+    'double': (float, DoubleType()),
     'float': (float, DoubleType()),
     'int': (int, IntegerType()),
     'string': (str, StringType()),
     'timestamp': (ts, TimestampType()),
+    'array_str': (str_array, ArrayType(StringType())),
+    'array_int': (int_array, ArrayType(IntegerType())),
+    'array_double': (float_array, ArrayType(DoubleType())),
+    'array_float': (float_array, ArrayType(FloatType())),
+    'array_array_str': (str_array_of_array, ArrayType(ArrayType(StringType()))),
+    'array_array_int': (int_array_of_array, ArrayType(ArrayType(IntegerType()))),
+    'array_array_double': (float_array_of_array, ArrayType(ArrayType(DoubleType()))),
+    'array_array_float': (float_array_of_array, ArrayType(ArrayType(DoubleType()))),
 }
 
 
