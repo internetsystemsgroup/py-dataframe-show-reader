@@ -19,8 +19,8 @@ from pyspark.sql.types import (ArrayType, BooleanType, DoubleType, FloatType, In
                                LongType, StringType, StructType, StructField, TimestampType)
 
 
-DATA_TYPE_START_INDICATOR = '{'
-DATA_TYPE_END_INDICATOR = '}'
+DATA_TYPE_START_INDICATOR = '['
+DATA_TYPE_END_INDICATOR = ']'
 
 ARRAY_ELEMENT_START_INDICATOR = '['
 ARRAY_ELEMENT_END_INDICATOR = ']'
@@ -45,10 +45,10 @@ def show_output_to_df(show_output: str, spark_session: SparkSession):
     |value 2a|value 2b|
 
     Optionally, data types can be specified in a second header line (prefixed
-    with the DATA_TYPE_START_INDICATOR "{") :
+    with the DATA_TYPE_START_INDICATOR "[") :
     +-------------+----------+------------+-------------------+-----------+
     |string_column|int_column|float_column|timestamp_column   |bool_column|
-    {string       |int       |float       |timestamp          |boolean    }
+    [string       |int       |float       |timestamp          |boolean    ]
     +-------------+----------+------------+-------------------+-----------+
     |one          |1         |1.1         |2018-01-01 00:00:00|true       |
     |two          |2         |2.2         |2018-01-02 12:34:56|false      |
@@ -80,7 +80,7 @@ def show_output_to_df(show_output: str, spark_session: SparkSession):
             column_names = values
             continue
         elif types == None and line.startswith(f'{DATA_TYPE_START_INDICATOR}'):
-            line = line.replace(f'{DATA_TYPE_START_INDICATOR}', '|').replace(f'{DATA_TYPE_END_INDICATOR}', '|')
+            line = line.replace(f'{DATA_TYPE_START_INDICATOR}', '|', 1).rstrip(f'{DATA_TYPE_END_INDICATOR}|') + '|'
             types = [part.strip() for part in line.split('|')[1:-1]]
             schema = _get_schema(column_names, types)
             continue

@@ -79,7 +79,7 @@ class TestDFUtil:
         rows = show_output_to_df("""
             +-------------+----------+-------------+------------+-------------------+-------------------+-----------+
             |string_column|int_column|bigint_column|float_column|timestamp_column   |default_type_column|bool_column|
-            {string       |int       |bigint       |float       |timestamp          |                   |boolean    }
+            [string       |int       |bigint       |float       |timestamp          |                   |boolean    ]
             +-------------+----------+-------------+------------+-------------------+-------------------+-----------+
             |one          |1         |1            |1.1         |2018-01-01 00:00:00|11                 |true       |
             |two          |2         |2            |2.2         |2018-01-02 12:34:56|22                 |false      |
@@ -113,7 +113,7 @@ class TestDFUtil:
         rows = show_output_to_df("""
             +-------------+----------+-------------+------------+-------------------+-------------------+-----------+
             |string_column|int_column|bigint_column|float_column|timestamp_column   |default_type_column|bool_column|
-            {string       |int       |bigint       |float       |timestamp          |                   |boolean    }
+            [string       |int       |bigint       |float       |timestamp          |                   |boolean    ]
             +-------------+----------+-------------+------------+-------------------+-------------------+-----------+
             |null         |null      |null         |null        |null               |null               |null       |
             +-------------+----------+-------------+------------+-------------------+-------------------+-----------+
@@ -135,7 +135,7 @@ class TestDFUtil:
         df = show_output_to_df("""
             +----+-------------+-------------+----------------+----------------+----------------------+
             |id  |array_str_col|array_int_col|array_float_col |array_double_col|array_array_float_col |
-            {int |array_str    |array_int    |array_float     |array_double    |array_array_float     }
+            [int |array_str    |array_int    |array_float     |array_double    |array_array_float     ]
             +----+-------------+-------------+----------------+----------------+----------------------+
             |1   |[hi,bye]     |[0,1,2]      |[0,1,2.0]       |[0,1,2.0]       |[[1,2],[1.0],[]]      |
             |2   |[]           |[]           |[]              |[]              |[]                    |
