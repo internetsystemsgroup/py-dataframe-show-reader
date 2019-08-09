@@ -15,8 +15,8 @@
 from datetime import datetime
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import Row
-from pyspark.sql.types import (ArrayType, BooleanType, DoubleType, FloatType, IntegerType,
-                               LongType, StringType, StructType, StructField, TimestampType)
+from pyspark.sql.types import (ArrayType, BooleanType, DoubleType, IntegerType, LongType,
+                               StringType, StructType, StructField, TimestampType)
 
 
 DATA_TYPE_START_INDICATOR = '['
@@ -233,7 +233,7 @@ _TYPE_MAP = {
     'array_str': (str_array, ArrayType(StringType())),
     'array_int': (int_array, ArrayType(IntegerType())),
     'array_double': (float_array, ArrayType(DoubleType())),
-    'array_float': (float_array, ArrayType(FloatType())),
+    'array_float': (float_array, ArrayType(DoubleType())),
     'array_array_str': (str_array_of_array, ArrayType(ArrayType(StringType()))),
     'array_array_int': (int_array_of_array, ArrayType(ArrayType(IntegerType()))),
     'array_array_double': (float_array_of_array, ArrayType(ArrayType(DoubleType()))),
