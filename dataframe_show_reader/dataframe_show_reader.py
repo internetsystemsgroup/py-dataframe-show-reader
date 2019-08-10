@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
+
 from datetime import datetime
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import Row
@@ -149,7 +151,7 @@ def array_string_to_list(the_string: str, data_type: type = str, splitter: str =
     :return: A list object with elements of type: 'data_type'.
     """
     array_bounds = f"{ARRAY_ELEMENT_START_INDICATOR}{ARRAY_ELEMENT_END_INDICATOR}"
-    list_of_strings = [x for x in the_string.strip().strip(array_bounds).split(splitter)]
+    list_of_strings = [x.strip() for x in the_string.strip().strip(array_bounds).split(splitter)]
 
     # Handle the empty list case cuz we can't cast an empty string to a number type.
     return ([]
@@ -162,6 +164,7 @@ def array_of_array_string_to_list(the_string: str, data_type: type = str):
     Convert a DataFrame show output-style array of arrays string into a list of lists value
     which will marshall to a Hive/Spark ArrayType(ArrayType(data_type))
     :param the_string: A string in the format: '[[val1,val2], [val3,val4], [val5]]'
+    or : '[WrappedArray(val1, val2), WrappedArray(val3), WrappedArray()]'
     :param data_type: The data_type of each element in the inner arrays.
     :return: A list object with elements of type: list of type 'data_type'.
     """
@@ -173,6 +176,14 @@ def array_of_array_string_to_list(the_string: str, data_type: type = str):
     #                to:  '[val1,val2], [val3,val4], [val5]'
     #              then:  '[val1,val2]| [val3,val4]| [val5]'
     # Then split on '|' and convert each '[val1,val2]' to a list.
+    #
+    # Also, since df.show() prints out arrays-of-arrays as:
+    #       [WrappedArray(val1, val2), WrappedArray(val3), WrappedArray()]
+    # we'll convert this to: '[[val1,val2], [val3], []]' then handle normally.
+
+    # first convert `WrappedArray()` syntax to '[]'
+    the_string = re.sub(r'WrappedArray\((.*?)\)', r'[\1]', the_string)
+
     new_separator = '|'
     inner_end_bound = f"{ARRAY_ELEMENT_END_INDICATOR},"
     new_inner_end_bound = f"{ARRAY_ELEMENT_END_INDICATOR}{new_separator}"
