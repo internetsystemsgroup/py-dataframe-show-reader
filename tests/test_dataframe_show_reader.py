@@ -130,56 +130,105 @@ class TestDFUtil:
         assert None == row['default_type_column']
         assert None == row['bool_column']
 
-    def test_show_output_to_df_with_arrays(self,
-                                           spark_session: SparkSession):
+    def test_show_output_to_df_with_1d_arrays(self,
+                                              spark_session: SparkSession):
         df = show_output_to_df("""
-                    +----+--------------------+-------------+----------------+----------------+----------------------+-------------------------------+
-                    |id  |array_str_col       |array_int_col|array_float_col |array_double_col|array_array_float_col |array_array_str_col            |
-                    [int |array_str           |array_int    |array_float     |array_double    |array_array_float     |array_array_str                ]
-                    +----+--------------------+-------------+----------------+----------------+----------------------+-------------------------------+
-                    |1   |[ hi ,bye, so long ]|[0,  1 ,2 ]  |[0, 1, 2.0]     |[0, 1, 2.0]     |[[1, 2],[1.0],[]]     |[[ hi , bye, so long ],[yo],[]]|
-                    |2   |[  ]                |[     ]      |[]              |[]              |[]                    |[]                             |
-                    +----+--------------------+-------------+----------------+----------------+----------------------+-------------------------------+
-                """, spark_session)
+                +----+--------------------+-------------+----------------+----------------+
+                |id  |array_str_col       |array_int_col|array_float_col |array_double_col|
+                [int |array<string>       |array<int>   |array<float>    |array<double>   |
+                +----+--------------------+-------------+----------------+----------------+
+                |1   |[ hi ,bye, so long ]|[0,  1 ,2 ]  |[0, 1, 2.0]     |[0, 1, 2.0]     |
+                |2   |[  ]                |[     ]      |[]              |[]              |
+                +----+--------------------+-------------+----------------+----------------+
+            """, spark_session)
         rows = df.collect()
         assert 2 == len(rows)
-        assert 7 == len(rows[0])  # Number of columns
+        assert 5 == len(rows[0])  # Number of columns
 
-        assert 1                                  == rows[0]['id']
-        assert ['hi','bye','so long']             == rows[0]['array_str_col']
-        assert [0,1,2]                            == rows[0]['array_int_col']
-        assert [0.0, 1.0, 2.0]                    == rows[0]['array_float_col']
-        assert [0.0, 1.0, 2.0]                    == rows[0]['array_double_col']
-        assert [[1.0, 2.0],[1.0],[]]              == rows[0]['array_array_float_col']
-        assert [['hi','bye','so long'],['yo'],[]] == rows[0]['array_array_str_col']
+        row = rows[0]
+        assert 1                                  == row['id']
+        assert ['hi','bye','so long']             == row['array_str_col']
+        assert [0,1,2]                            == row['array_int_col']
+        assert [0.0, 1.0, 2.0]                    == row['array_float_col']
+        assert [0.0, 1.0, 2.0]                    == row['array_double_col']
 
-        assert 2                     == rows[1]['id']
-        assert []                    == rows[1]['array_str_col']
-        assert []                    == rows[1]['array_int_col']
-        assert []                    == rows[1]['array_float_col']
-        assert []                    == rows[1]['array_double_col']
-        assert [[]]                  == rows[1]['array_array_float_col']
-        assert [[]]                  == rows[1]['array_array_str_col']
+        row = rows[1]
+        assert 2                     == row['id']
+        assert []                    == row['array_str_col']
+        assert []                    == row['array_int_col']
+        assert []                    == row['array_float_col']
+        assert []                    == row['array_double_col']
+
+    def test_show_output_to_df_with_2d_arrays(self,
+                                              spark_session: SparkSession):
+        df = show_output_to_df("""
+                +----+--------------------------------+----------------------+----------------------+-----------------------+
+                |id  |array_array_str_col             |array_array_int_col   |array_array_float_col |array_array_double_col |
+                [int |array<array<string>>            |array<array<int>>     |array<array<float>>   |array<array<double>>   |
+                +----+--------------------------------+----------------------+----------------------+-----------------------+
+                |1   |[[ hi , bye, so long ],[yo],[]] |[[ 1 , 2 ],[-1],[]]   |[[ 1 , 2 ],[-1.0],[]] |[[ -1 , 2 ],[ 1.0 ],[]]|
+                |2   |[]                              |[]                    |[]                    |[]                     |
+                |3   |[[]]                            |[[],[]]               |[[],[],[]]            |[ [] ]                 |
+                +----+--------------------------------+----------------------+----------------------+-----------------------+
+            """, spark_session)
+        rows = df.collect()
+        assert 3 == len(rows)
+        assert 5 == len(rows[0])  # Number of columns
+
+        row = rows[0]
+        assert 1                                  == row['id']
+        assert [['hi','bye','so long'],['yo'],[]] == row['array_array_str_col']
+        assert [[1, 2],[-1],[]]                   == row['array_array_int_col']
+        assert [[1.0, 2.0],[-1.0],[]]             == row['array_array_float_col']
+        assert [[-1.0, 2.0],[1.0],[]]             == row['array_array_double_col']
+
+        row = rows[1]
+        assert 2                     == row['id']
+        assert [[]]                  == row['array_array_str_col']
+        assert [[]]                  == row['array_array_int_col']
+        assert [[]]                  == row['array_array_float_col']
+        assert [[]]                  == row['array_array_double_col']
+
+        row = rows[2]
+        assert 3                     == row['id']
+        assert [[]]                  == row['array_array_str_col']
+        assert [[],[]]               == row['array_array_int_col']
+        assert [[],[],[]]            == row['array_array_float_col']
+        assert [[]]                  == row['array_array_double_col']
 
     def test_show_output_to_df_with_wrapped_arrays(self,
                                                    spark_session: SparkSession):
         df = show_output_to_df("""
-                +---+-----------------------------------------------------------+------------------------------------------------------------------+
-                |id |array_array_float_col                                      |array_array_str_col                                               |
-                [int|array_array_float                                          |array_array_str                                                   |
-                +---+-----------------------------------------------------------+------------------------------------------------------------------+
-                |1  |[WrappedArray(1.0, 2.0), WrappedArray(1.0), WrappedArray()]|[WrappedArray(hi, bye, so long), WrappedArray(yo), WrappedArray()]|
-                |2  |[WrappedArray()]                                           |[WrappedArray()]                                                  |
-                +---+-----------------------------------------------------------+------------------------------------------------------------------+
-                """, spark_session)
+            +---+------------------------------------------------------------------+-------------------------------------------------------+-----------------------------------------------------------+-----------------------------------------------------------+
+            |id |array_array_str_col                                               |array_array_int_col                                    |array_array_float_col                                      |array_array_double_col                                     |
+            [int|array<array<string>>                                              |array<array<int>>                                      |array<array<float>>                                        |array<array<double>>                                       |
+            +---+------------------------------------------------------------------+-------------------------------------------------------+-----------------------------------------------------------+-----------------------------------------------------------+
+            |1  |[WrappedArray(hi, bye, so long), WrappedArray(yo), WrappedArray()]|[WrappedArray(1, 2), WrappedArray(1), WrappedArray()]  |[WrappedArray(1.0, 2.0), WrappedArray(1.0), WrappedArray()]|[WrappedArray(1.0, 2.0), WrappedArray(1.0), WrappedArray()]|
+            |2  |[WrappedArray()]                                                  |[WrappedArray()]                                       |[WrappedArray()]                                           |[WrappedArray()]                                           |
+            |3  |[WrappedArray()]                                                  |[WrappedArray(), WrappedArray()]                       |[WrappedArray(), WrappedArray(), WrappedArray()]           |[WrappedArray()]                                           |
+            +---+------------------------------------------------------------------+-------------------------------------------------------+-----------------------------------------------------------+-----------------------------------------------------------+
+            """, spark_session)
         rows = df.collect()
-        assert 2 == len(rows)
-        assert 3 == len(rows[0])  # Number of columns
+        assert 3 == len(rows)
+        assert 5 == len(rows[0])  # Number of columns
 
-        assert 1                                  == rows[0]['id']
-        assert [[1.0, 2.0],[1.0],[]]              == rows[0]['array_array_float_col']
-        assert [['hi','bye','so long'],['yo'],[]] == rows[0]['array_array_str_col']
+        row = rows[0]
+        assert 1                                  == row['id']
+        assert [['hi','bye','so long'],['yo'],[]] == row['array_array_str_col']
+        assert [[1, 2],[1],[]]                    == row['array_array_int_col']
+        assert [[1.0, 2.0],[1.0],[]]              == row['array_array_float_col']
+        assert [[1.0, 2.0],[1.0],[]]              == row['array_array_double_col']
 
-        assert 2                     == rows[1]['id']
-        assert [[]]                  == rows[1]['array_array_float_col']
-        assert [[]]                  == rows[1]['array_array_str_col']
+        row = rows[1]
+        assert 2                     == row['id']
+        assert [[]]                  == row['array_array_str_col']
+        assert [[]]                  == row['array_array_int_col']
+        assert [[]]                  == row['array_array_float_col']
+        assert [[]]                  == row['array_array_double_col']
+
+        row = rows[2]
+        assert 3                     == row['id']
+        assert [[]]                  == row['array_array_str_col']
+        assert [[],[]]               == row['array_array_int_col']
+        assert [[],[],[]]            == row['array_array_float_col']
+        assert [[]]                  == row['array_array_double_col']

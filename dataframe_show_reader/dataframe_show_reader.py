@@ -241,14 +241,14 @@ _TYPE_MAP = {
     'int': (int, IntegerType()),
     'string': (str, StringType()),
     'timestamp': (ts, TimestampType()),
-    'array_str': (str_array, ArrayType(StringType())),
-    'array_int': (int_array, ArrayType(IntegerType())),
-    'array_double': (float_array, ArrayType(DoubleType())),
-    'array_float': (float_array, ArrayType(DoubleType())),
-    'array_array_str': (str_array_of_array, ArrayType(ArrayType(StringType()))),
-    'array_array_int': (int_array_of_array, ArrayType(ArrayType(IntegerType()))),
-    'array_array_double': (float_array_of_array, ArrayType(ArrayType(DoubleType()))),
-    'array_array_float': (float_array_of_array, ArrayType(ArrayType(DoubleType()))),
+    'array<string>': (str_array, ArrayType(StringType())),
+    'array<int>': (int_array, ArrayType(IntegerType())),
+    'array<double>': (float_array, ArrayType(DoubleType())),
+    'array<float>': (float_array, ArrayType(DoubleType())),
+    'array<array<string>>': (str_array_of_array, ArrayType(ArrayType(StringType()))),
+    'array<array<int>>': (int_array_of_array, ArrayType(ArrayType(IntegerType()))),
+    'array<array<double>>': (float_array_of_array, ArrayType(ArrayType(DoubleType()))),
+    'array<array<float>>': (float_array_of_array, ArrayType(ArrayType(DoubleType()))),
 }
 
 
