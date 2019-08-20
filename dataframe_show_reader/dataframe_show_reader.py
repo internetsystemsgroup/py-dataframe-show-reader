@@ -46,8 +46,8 @@ def show_output_to_df(show_output: str, spark_session: SparkSession):
     # This is a comment that gets ignored.
     |value 2a|value 2b|
 
-    Optionally, data types can be specified in a second header line (prefixed
-    with the DATA_TYPE_START_INDICATOR "[") :
+    Optionally, data types can be specified in a second header line, prefixed
+    with the DATA_TYPE_START_INDICATOR ("["):
     +-------------+----------+------------+-------------------+-----------+
     |string_column|int_column|float_column|timestamp_column   |bool_column|
     [string       |int       |float       |timestamp          |boolean    ]
@@ -78,11 +78,11 @@ def show_output_to_df(show_output: str, spark_session: SparkSession):
         values = [part.strip() for part in line_parts]
         if types is not None:
             _cast_types(values, types)
-        if column_names == None:
+        if column_names is None:
             column_names = values
             continue
-        elif types == None and line.startswith(f'{DATA_TYPE_START_INDICATOR}'):
-            line = line.replace(f'{DATA_TYPE_START_INDICATOR}', '|', 1).rstrip(f'{DATA_TYPE_END_INDICATOR}|') + '|'
+        elif types is None and line.startswith(DATA_TYPE_START_INDICATOR):
+            line = line.replace(DATA_TYPE_START_INDICATOR, '|', 1).rstrip(f'{DATA_TYPE_END_INDICATOR}|') + '|'
             types = [part.strip() for part in line.split('|')[1:-1]]
             schema = _get_schema(column_names, types)
             continue
@@ -102,7 +102,7 @@ def save_as_table(table_name: str,
     to a Hive table.
     :param table_name: The name of the Hive table to which the DataFrame will be
            persisted. Should be in "<database_name>.<table_name>" format
-           (e.g., "my_db.mytable").
+           (e.g., "my_db.my_table").
     :param show_output: A string that resembles the output of a call to
            DataFrame.show()
     :param spark_session: A SparkSession used to create the new DataFrame instance
@@ -122,8 +122,8 @@ def save_df_as_table(table_name: str,
     Persists a DataFrame to a Hive table.
     :param table_name: The name of the Hive table to which the DataFrame will be
            persisted. Should be in "<database_name>.<table_name>" format
-           (e.g., "my_db.mytable").
-    :param The DataFrame to be persisted
+           (e.g., "my_db.my_table").
+    :param df: The DataFrame to be persisted
     :param spark_session: A SparkSession used to create the new DataFrame instance
     :param partition_cols: Optional list of columns on which to partition the table
     :return: None
@@ -136,21 +136,22 @@ def ts(timestamp_string: str):
     """
     Convert a DataFrame show output-style timestamp string into a datetime value
     which will marshall to a Hive/Spark TimestampType
-    :param date_string: A date string in "YYYY-MM-DD HH:MM:SS" format
+    :param timestamp_string: A timestamp string in "YYYY-MM-DD HH:MM:SS" format
     :return: A datetime object
     """
     return datetime.strptime(timestamp_string, '%Y-%m-%d %H:%M:%S')
 
-def array_string_to_list(the_string: str, data_type: type = str, splitter: str = ','):
+
+def array_string_to_list(the_string: str, data_type: type = type, splitter: str = ','):
     """
     Convert a DataFrame show output-style array string into a list value
     which will marshall to a Hive/Spark ArrayType
     :param the_string: A string in the format: '[val1, val2, val3]'
     :param data_type: The data_type of each element in the array.
     :param splitter: The char/string on which we split the str_array
-    :return: A list object with elements of type: 'data_type'.
+    :return: A list containing elements of the type indicated by 'data_type'.
     """
-    array_bounds = f"{ARRAY_ELEMENT_START_INDICATOR}{ARRAY_ELEMENT_END_INDICATOR}"
+    array_bounds = f'{ARRAY_ELEMENT_START_INDICATOR}{ARRAY_ELEMENT_END_INDICATOR}'
     list_of_strings = [x.strip() for x in the_string.strip().strip(array_bounds).split(splitter)]
 
     # Handle the empty list case cuz we can't cast an empty string to a number type.
@@ -181,12 +182,12 @@ def array_of_array_string_to_list(the_string: str, data_type: type = str):
     #       [WrappedArray(val1, val2), WrappedArray(val3), WrappedArray()]
     # we'll convert this to: '[[val1,val2], [val3], []]' then handle normally.
 
-    # first convert `WrappedArray()` syntax to '[]'
+    # first convert 'WrappedArray()' syntax to '[]'
     the_string = re.sub(r'WrappedArray\((.*?)\)', r'[\1]', the_string)
 
     new_separator = '|'
-    inner_end_bound = f"{ARRAY_ELEMENT_END_INDICATOR},"
-    new_inner_end_bound = f"{ARRAY_ELEMENT_END_INDICATOR}{new_separator}"
+    inner_end_bound = f'{ARRAY_ELEMENT_END_INDICATOR},'
+    new_inner_end_bound = f'{ARRAY_ELEMENT_END_INDICATOR}{new_separator}'
 
     return ([array_string_to_list(x, data_type)
              for x in the_string.strip()[1:-1]
