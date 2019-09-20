@@ -13,13 +13,12 @@
 # limitations under the License.
 
 import re
-
 from datetime import datetime
+
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import Row
 from pyspark.sql.types import (ArrayType, BooleanType, DoubleType, IntegerType, LongType,
                                StringType, StructType, StructField, TimestampType)
-
 
 DATA_TYPE_START_INDICATOR = '['
 DATA_TYPE_END_INDICATOR = ']'
@@ -28,7 +27,11 @@ ARRAY_ELEMENT_START_INDICATOR = '['
 ARRAY_ELEMENT_END_INDICATOR = ']'
 
 
-def show_output_to_df(show_output: str, spark_session: SparkSession):
+def show_output_to_df(
+        show_output: str,
+        spark_session: SparkSession,
+        default_data_type: str = 'string'
+):
     """
     Takes a string containing the output of a Spark DataFrame.show() call and
     "rehydrates" it into a new Spark DataFrame instance. Example input:
@@ -59,10 +62,13 @@ def show_output_to_df(show_output: str, spark_session: SparkSession):
     :param show_output: A string that resembles the output of a call to
            DataFrame.show()
     :param spark_session: A SparkSession used to create the new DataFrame instance
+    :param default_data_type: The default data type that will be used for all
+           columns for which the data type is not specified in the data type
+           declaration line
     :return: A DataFrame containing the values represented in the input string
     """
     if not show_output:
-        raise ValueError("show_output is required.")
+        raise ValueError('show_output is required.')
 
     rows = []
     column_names = None
@@ -76,18 +82,33 @@ def show_output_to_df(show_output: str, spark_session: SparkSession):
             continue
         line_parts = line.split('|')[1:-1]
         values = [part.strip() for part in line_parts]
-        if types is not None:
-            _cast_types(values, types)
         if column_names is None:
             column_names = values
             continue
-        elif types is None and line.startswith(DATA_TYPE_START_INDICATOR):
-            line = line.replace(DATA_TYPE_START_INDICATOR, '|', 1).rstrip(f'{DATA_TYPE_END_INDICATOR}|') + '|'
-            types = [part.strip() for part in line.split('|')[1:-1]]
-            schema = _get_schema(column_names, types)
-            continue
+        if line.startswith(DATA_TYPE_START_INDICATOR):
+            if types is None:
+                line = line.replace(DATA_TYPE_START_INDICATOR, '|', 1)\
+                           .rstrip(f'{DATA_TYPE_END_INDICATOR}|') + '|'
+                types = [part.strip() for part in line.split('|')[1:-1]]
+                types = [data_type if len(data_type) > 0 else default_data_type
+                         for data_type in types]
+                continue
+            else:
+                raise ValueError('Cannot have more than one data type declaration line.')
+
+        if types is None:
+            types = [default_data_type] * len(column_names)
+
+        _cast_types(values, types)
         row_dict = dict(zip(column_names, values))
         rows.append(Row(**row_dict))
+
+    if types is None:
+        # This can happen if data types are not specified and no data rows are
+        # provided.
+        types = [default_data_type] * len(column_names)
+    schema = _get_schema(column_names, types)
+
     # Return a DataFrame with the columns in the original order:
     return spark_session.createDataFrame(rows, schema=schema).select(column_names)
 
@@ -128,7 +149,8 @@ def save_df_as_table(table_name: str,
     :param partition_cols: Optional list of columns on which to partition the table
     :return: None
     """
-    df.write.partitionBy(partition_cols).saveAsTable(table_name, mode='Overwrite')
+    df.repartition(1).write.partitionBy(partition_cols) \
+        .saveAsTable(table_name, mode='Overwrite')
     spark_session.sql(f'REFRESH TABLE {table_name}')
 
 
@@ -233,8 +255,9 @@ def _parse_boolean(boolean: str):
         raise ValueError(f'"{boolean}" is not a recognized boolean value')
 
 
+# By convention, the type map keys should be lowercase versions of Spark SQL
+# keywords that would be valid in a CREATE TABLE statement.
 _TYPE_MAP = {
-    '': (str, StringType()),  # Default
     'bigint': (int, LongType()),
     'boolean': (_parse_boolean, BooleanType()),
     'double': (float, DoubleType()),
@@ -281,7 +304,8 @@ def _get_schema(columns: list, types: list):
     # Sort the dictionary by column and add each
     # column (in order) to our schema.
     for col_type in sorted(col_types.items(), key=lambda kv: kv[0]):
-        if col_type[1] not in _TYPE_MAP:
-            raise ValueError(f'Unrecognized data type "{col_type[1]}"')
-        schema_columns.append(StructField(col_type[0], _TYPE_MAP[col_type[1]][1]))
+        data_type = col_type[1]
+        if data_type not in _TYPE_MAP:
+            raise ValueError(f'Unrecognized data type "{data_type}"')
+        schema_columns.append(StructField(col_type[0], _TYPE_MAP[data_type][1]))
     return StructType(schema_columns)
