@@ -3,7 +3,9 @@
 By Steve Whalen, VideoAmp
 
 At this point in history, most software developers acknowledge automated
-testing as an essential part of their work. Yet, we often see developers who work on data transformations in ETL pipelines omitting automated testing from their process.
+testing as an essential part of their work. Yet, we often see developers who
+work on data transformations in ETL pipelines omitting automated testing from
+their process.
 
 Insufficient testing can allow inaccurate data to flow through a system. For
 public-facing data sets, this is not a good look.
@@ -51,7 +53,8 @@ order to keep our test suite runtime to a comfortable duration.
 
 Second, in many cases there are interactions between different rows in the
 input data set. For example, the transformation under test may need to group
-certain rows by a compound primary key and take only the resulting row with the most recent creation date.
+certain rows by a compound primary key and take only the resulting row with the
+most recent creation date.
 
 We've seen tests of sophisticated transformations that have had a dozen or more
 edge cases embedded with them. In these situations, the practical reality is
@@ -69,7 +72,8 @@ If we notice a piece of information in the input data (a ZIP code, for example),
 and would like to see where it shows up in the output data, combining the inputs
 and outputs in a single file makes it simpler to search for both occurrences.
 
-Based on these observations, we had a couple of goals in mind for our tests of Spark data transformations:
+Based on these observations, we had a couple of goals in mind for our tests of
+Spark data transformations:
 
 1. Provide a way to concisely express the input and expected output data within
    the test file itself.
@@ -105,8 +109,8 @@ what the method under test requires.
 Imagine we are working on a Python method that uses PySpark to perform a data
 transformation that is not terribly complex, but complicated enough that we would
 like to verify that it performs as intended. For example, consider this
-function that accepts a PySpark Dataframe containing daily sales figures and
-returns a Dataframe containing containing weekly sales summaries:
+function that accepts a PySpark DataFrame containing daily sales figures and
+returns a DataFrame containing containing weekly sales summaries:
 
 ```python
 def summarize_weekly_sales(df_to_average: DataFrame):
@@ -136,9 +140,9 @@ using aggregate, grouping and window functions,
 interactions between different rows can be easy to overlook. Tweaking a
 query to fix an aggregate function like a summation might inadvertently break
 the intended behavior of a windowing function in the query.
-A change to the query might allow a summation-only unit test to pass while leaving broken
-window function behavior undetected because we have neglected to  update
-the window-function-only unit test.  
+A change to the query might allow a summation-only unit test to pass while
+leaving broken window function behavior undetected because we have neglected to
+update the window-function-only unit test.  
 
 If we accept that we'd like to use a single test to verify the three
 requirements of our query, we need three rows in our input DataFrame.
@@ -167,10 +171,15 @@ def test_without_dataframe_show_reader(spark_session: SparkSession):
     input_df = spark_session.createDataFrame(input_rows)
 
     result = summarize_weekly_sales(input_df).collect()
-    assert 2 == len(result)
+
+    assert 2 == len(result)  # Number of rows
+    assert 3 == len(result[0])  # Number of columns
     assert 1 == result[0]['week_of_year']
     assert 15 == result[0]['avg_units_sold']
     assert 300 == result[0]['gross_sales']
+    assert 2 == result[1]['week_of_year']
+    assert 80 == result[1]['avg_units_sold']
+    assert 800 == result[1]['gross_sales']
 ```
 
 Using the DataFrame Show Reader, our test could instead look like this:
@@ -183,15 +192,21 @@ def test_using_dataframe_show_reader(spark_session: SparkSession):
     +-------------------+----------+-----------+
     |2019-01-01 00:00:00|10        |100        |
     |2019-01-02 00:00:00|20        |200        |
-    |2019-01-08 00:00:00|80        |800        |
+    |2019-01-08 00:00:00|80        |800        | This date is in week 2.
     +-------------------+----------+-----------+
     """, spark_session)
 
-    result = summarize_weekly_sales(input_df).collect()
-    assert 2 == len(result)
-    assert 1 == result[0]['week_of_year']
-    assert 15 == result[0]['avg_units_sold']
-    assert 300 == result[0]['gross_sales']
+    expected_df = show_output_to_df("""
+    +------------+--------------+-----------+
+    |week_of_year|avg_units_sold|gross_sales|
+    [int         |double        |double     ]
+    +------------+--------------+-----------+
+    |1           |15            |300        |
+    |2           |80            |800        |
+    +------------+--------------+-----------+
+    """, spark_session)
+
+    assert_equal(expected_df, summarize_weekly_sales(input_df))
 ```
 
 In the second test example, the ``show_output_to_df`` function accepts as input
@@ -225,13 +240,26 @@ ourselves to exceed recommended maximum line lengths. The reasoning is
 that in the case of tabular data, exceeding the maximum line length when
 necessary actually makes the code more readable than the alternatives.
 
+Notice also that the ``show_output_to_df`` function gives us a convenient way
+to create an ``expected_df`` to pass to the ``assert_equal`` function (to check
+DataFrame equality) that is included in the package. In addition to allowing
+this compact display of the expected numbers of rows and columns and data,
+``assert_equal`` checks that the DataFrame schemas match, which the first
+version of the test does not do.
+
 ## Where to Find It
 
 You can find `py-dataframe-show-reader` here:
 
 https://github.com/internetsystemsgroup/py-dataframe-show-reader/
 
-We plan to release a Scala version in the near future.
+We plan to release a Scala version in the future.
+
+## Installation
+
+To install the package for use in your own package, run:
+
+`pip install py-dataframe-show-reader`
 
 Please let us know if you find this helpful, or if you have any suggestions that
 might make it even more useful.
