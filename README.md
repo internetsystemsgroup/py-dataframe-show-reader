@@ -11,7 +11,7 @@ Imagine we are working on a Python method that uses PySpark to perform a data
 transformation that is not terribly complex, but complex enough that we would
 like to verify that it performs as intended. For example, consider this
 function that accepts a PySpark Dataframe containing daily sales figures and
-returns a Dataframe containing containing weekly sales summaries:
+returns a Dataframe containing weekly sales summaries:
 
 ```python
 def summarize_weekly_sales(df_to_average: DataFrame):
